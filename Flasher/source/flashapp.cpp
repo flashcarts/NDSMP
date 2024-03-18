@@ -45,7 +45,7 @@ void FlashApp()
 {
 	xprintf("GBA Movie Player flasher v1.2\n");
 	xprintf(" by Rafael Vuijk (DarkFader) \n");
-	xprintf("NDSMP - GBAMP FW Hack v2.03  \n");
+	xprintf("NDSMP - GBAMP FW Hack v2.11  \n");
 	xprintf(" NDS support for GBAMP       \n");
 	xprintf(" by Michael Chisholm (Chishm)\n");
 	xprintf("\n");

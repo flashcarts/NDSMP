@@ -112,7 +112,7 @@ DEPENDS	:=	$(OFILES:.o=.d)
 # main targets
 #---------------------------------------------------------------------------------
 $(OUTPUT).nds	: 	$(OUTPUT).arm9
-	@ndstool -c $@ -9 $< -b $(CURDIR)/../icon.bmp "NDS MP;GBAMP NDS Firmware Hack Version 2.0;By Chishm"
+	@ndstool -c $@ -9 $< -b $(CURDIR)/../icon.bmp "NDS MP;GBAMP NDS Firmware Hack Version 2.11;By Chishm"
 	
 $(OUTPUT).arm9	:	$(OUTPUT).elf
 $(OUTPUT).elf	:	$(OFILES)

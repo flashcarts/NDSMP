@@ -56,6 +56,37 @@ Helpful information:
 #define STORED_FILE_SECTOR (*(vu32*)0x027FFFF8)
 const char* bootName = "_BOOT_MP.NDS";
 
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Firmware stuff
+
+#define FW_READ        0x03
+
+void readFirmware(uint32 address, uint32 size, uint8 * buffer) {
+  uint32 index;
+
+  // Read command
+  while (REG_SPICNT & SPI_BUSY);
+  REG_SPICNT = SPI_ENABLE | SPI_CONTINUOUS | SPI_DEVICE_NVRAM;
+  REG_SPIDATA = FW_READ;
+  while (REG_SPICNT & SPI_BUSY);
+
+  // Set the address
+  REG_SPIDATA =  (address>>16) & 0xFF;
+  while (REG_SPICNT & SPI_BUSY);
+  REG_SPIDATA =  (address>>8) & 0xFF;
+  while (REG_SPICNT & SPI_BUSY);
+  REG_SPIDATA =  (address) & 0xFF;
+  while (REG_SPICNT & SPI_BUSY);
+
+  for (index = 0; index < size; index++) {
+    REG_SPIDATA = 0;
+    while (REG_SPICNT & SPI_BUSY);
+    buffer[index] = REG_SPIDATA & 0xFF;
+  }
+  REG_SPICNT = 0;
+}
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // CF card stuff
 //#define _CF_USE_DMA
@@ -907,6 +938,8 @@ Modified by Chishm:
 void __attribute__ ((long_call)) resetMemory_ARM7 (void)
 {
 	int i;
+	u8 settings1, settings2;
+	
 	REG_IME = 0;
 
 	for (i=0; i<16; i++) {
@@ -956,7 +989,7 @@ void __attribute__ ((long_call)) resetMemory_ARM7 (void)
 
 	// clear most of EWRAM - except after 0x023FF800, which has DS settings
 	"mov r8, #0x02000000		\n"	// Start address part 1 
-	"orr r8, r8, #0x4000		\n" // Start address part 2
+	"orr r8, r8, #0x8000		\n" // Start address part 2
 	"mov r9, #0x02300000		\n" // End address part 1
 	"orr r9, r9, #0xff000		\n" // End address part 2
 	"orr r9, r9, #0x00800		\n" // End address part 3
@@ -974,6 +1007,16 @@ void __attribute__ ((long_call)) resetMemory_ARM7 (void)
 	(*(vu32*)(0x04000000-4)) = 0;  //IRQ_HANDLER ARM7 version
 	(*(vu32*)(0x04000000-8)) = ~0; //VBLANK_INTR_WAIT_FLAGS, ARM7 version
 	POWER_CR = 1;  //turn off power to stuffs
+	
+	// Reload DS Firmware settings
+	readFirmware((u32)0x03FE70, 0x1, &settings1);
+	readFirmware((u32)0x03FF70, 0x1, &settings2);
+	
+	if (settings1 > settings2) {
+		readFirmware((u32)0x03FE00, 0x70, (u8*)0x027FFC80);
+	} else {
+		readFirmware((u32)0x03FF00, 0x70, (u8*)0x027FFC80);
+	}
 }
 
 
@@ -1004,20 +1047,10 @@ void __attribute__ ((long_call)) loadBinary_ARM7 (u32 fileCluster)
 	} else {
 		fileRead(ARM7_DST, fileCluster, ARM7_SRC, ARM7_LEN);
 	}
-	if (((u32)ndsHeader[0x050>>2]) != 0)
+	if (((ndsHeader[0x070>>2]) != 0) && ((ndsHeader[0x04c>>2]) != 0))
 	{
 		__asm volatile ("swi 0x00");
 	}
-
-/* Not needed for WMB demos	
-	//mirrored header CRC
-	(*(vu16*)0x027FF808) = ndsHeader[0x15E>>2];
-	(*(vu16*)0x027FFC08) = ndsHeader[0x15E>>2];
-
-	//mirrored secure area CRC
-	(*(vu16*)0x027FF80A) = ndsHeader[0x06C>>2];
-	(*(vu16*)0x027FFC0A) = ndsHeader[0x06C>>2];
-*/
 
 	// first copy the header to its proper location, excluding
 	// the ARM9 start address, so as not to start it
@@ -1183,11 +1216,11 @@ int main (void) {
 	
 	// Load the NDS file
 	loadBinary_ARM7(fileCluster);
-
+	
 	// Store start cluster and sector of loaded file, in case the loaded NDS wants it
 	STORED_FILE_CLUSTER = fileCluster;
 	STORED_FILE_SECTOR = FAT_ClustToSect(fileCluster);
-	
+
 	// ARM7 moved out of SIWRAM to clear it, then start binaries
 	// copy ARM7 function to location just after ARM9 start function,
 	// and make the ARM7 jump to it
