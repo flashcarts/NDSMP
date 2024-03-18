@@ -1,0 +1,1 @@
+<Project name="BootLoader"><File path="source\boot.c"></File><File path="specs\gba_mp_ds_crt0.s"></File><File path="specs\gba_mp_ds.ld"></File><File path="Makefile"></File><File path="C:\dev\Projects\GBA\GBAMP_FW\FW_Hack\ndsmp.txt"></File></Project>

@@ -1,0 +1,240 @@
+/*---------------------------------------------------------
+ GBAMP Firmware flasher
+ Written by DarkFader
+ 
+ flash.cpp
+---------------------------------------------------------*/
+
+/*
+ * Includes
+ */
+#include "flash.h"
+
+/*
+ * addrbits
+ */
+struct
+{
+	int bitnum;
+	int invert;
+} addrbits[] =
+{
+// 0
+	10,	1,		// pin 6
+	11,	1,		// pin 5
+	12,	1,		// pin 4
+	8,	1,		// pin 8
+	9,	0,		// pin 7
+	7,	0,		// pin 18
+	6,	0,		// pin 19
+// 8
+	5,	1,		// pin 20
+	2,	0,		// pin 23
+	3,	1,		// pin 22
+	4,	1,		// pin 21
+	0,	1,		// pin 25
+	1,	1,		// pin 24
+	-1,	0,		// unused
+	-1,	0,		// unused
+// 16
+	-1,	0,		// unused
+	13,	0,		// pin 3
+	14,	0,		// pin 2
+	15,	0,		// pin 1
+	16,	0,		// pin 48
+	17,	0,		// pin 17
+	18,	0,		// pin 16
+};
+
+#define	ADDRBITS	(sizeof(addrbits) / sizeof(addrbits[0]))
+
+/*
+ * unlock
+ */
+unsigned int unlock[] =
+{
+	0x0158, 0x015A, 0x0064, 0x0066, 0x01C8, 0x01CA, 0x00D0, 0x00D2,
+	0x0180, 0x0182, 0x01FC, 0x01FE, 0x0150, 0x0152, 0x01C4, 0x01C6,
+	0x0084, 0x0086, 0x01E0, 0x01E2, 0x0154, 0x0156, 0x013C, 0x013E,
+	0x0024, 0x0026, 0x0178, 0x017A, 0x01B8, 0x01BA, 0x0124, 0x0126,
+	0x01B4, 0x01B6, 0x0154, 0x0156, 0x00E0, 0x00E2, 0x01E8, 0x01EA,
+	0x011C, 0x011E, 0x007C, 0x007E, 0x01E0, 0x01E2, 0x0000, 0x0002,
+	0x001C, 0x001E, 0x0030, 0x0032, 0x0114, 0x0116, 0x01E4, 0x01E6,
+	0x0134, 0x0136, 0x0058, 0x005A, 0x0034, 0x0036, 0x0158, 0x015A,
+	0x00B0, 0x00B2, 0x01B0, 0x01B2, 0x0190, 0x0192, 0x01A4, 0x01A6,
+	0x0114, 0x0116, 0x011C, 0x011E, 0x01EC, 0x01EE, 0x00D4, 0x00D6,
+	0x013C, 0x013E, 0x00F4, 0x00F6, 0x002C, 0x002E, 0x0138, 0x013A,
+	0x004C, 0x004E, 0x0154, 0x0156, 0x00E4, 0x00E6, 0x0018, 0x001A,
+	0x0120, 0x0122, 0x0144, 0x0146, 0x00F4, 0x00F6, 0x0090, 0x0092,
+	0x01C4, 0x01C6, 0x0158, 0x015A, 0x007C, 0x007E, 0x015C, 0x015E,
+	0x002C, 0x002E, 0x0040, 0x0042, 0x00EC, 0x00EE, 0x01D0, 0x01D2,
+	0x01AC, 0x01AE, 0x00DC, 0x00DE, 0x01C8, 0x01CA, 0x00F8, 0x00FA,
+	0x017C, 0x017E, 0x0010, 0x0012, 0x0164, 0x0166, 0x0058, 0x005A,
+	0x0048, 0x004A, 0x0168, 0x016A, 0x0030, 0x0032, 0x00B4, 0x00B6,
+	0x0064, 0x0066, 0x0000, 0x0002, 0x000C, 0x000E, 0x009C, 0x009E,
+	0x00C0, 0x00C2, 0x01E4, 0x01E6, 0x0138, 0x013A, 0x0004, 0x0006,
+	0x0188, 0x018A, 0x0054, 0x0056, 0x012C, 0x012E, 0x01BC, 0x01BE,
+	0x01B0, 0x01B2, 0x0040, 0x0042, 0x0120, 0x0122, 0x0134, 0x0136,
+	0x01A4, 0x01A6, 0x01C0, 0x01C2, 0x01F4, 0x01F6, 0x0110, 0x0112,
+	0x0080, 0x0082, 0x00F4, 0x00F6, 0x00B0, 0x00B2, 0x0020, 0x0022,
+	0x0044, 0x0046, 0x014C, 0x014E, 0x0130, 0x0132, 0x007C, 0x007E,
+	0x0024, 0x0026, 0x01D4, 0x01D6, 0x005C, 0x005E, 0x0030, 0x0032,
+	0x01F8, 0x01FA, 0x01F4, 0x01F6, 0x00A4, 0x00A6, 0x0170, 0x0172,
+};
+
+/*
+ * FlashUnlock
+ */
+void FlashUnlock()
+{
+	for (int i=0; i<sizeof(unlock) / sizeof(unlock[0]); i++)
+	{
+		CartRead(unlock[i] >> 1);
+	}
+}
+
+/*
+ * FlashToCart
+ */
+unsigned int FlashToCart(unsigned int flash_addr)
+{
+	unsigned int cart_addr = 0;
+	for (int j=0; j<ADDRBITS; j++)
+	{
+		if (addrbits[j].bitnum >= 0)
+		{
+			cart_addr ^= ((flash_addr >> addrbits[j].bitnum & 1) ^ addrbits[j].invert) << j;
+		}
+	}
+	return cart_addr;
+}
+
+/*
+ * FlashID
+ */
+unsigned int FlashID()
+{
+	CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+	CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+	CartWrite(0x213C2, 0x90);	//FlashWrite(0x5555, 0x90);
+	unsigned short a = CartRead(0x1E8F);	//FlashRead(0);
+	unsigned short b = CartRead(0x168F);	//FlashRead(1);
+	CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+	CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+	CartWrite(0x213C2, 0xF0);	//FlashWrite(0x5555, 0xF0);
+	return a | b<<16;
+}
+
+/*
+ * FlashEraseChip
+ */
+int FlashEraseChip()
+{
+	CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+	CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+	CartWrite(0x213C2, 0x80);	//FlashWrite(0x5555, 0x80);
+	CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+	CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+	CartWrite(0x213C2, 0x10);	//FlashWrite(0x5555, 0x10);
+	
+	Delay100ms();
+	
+	while (1)
+	{
+		unsigned short x = CartRead(0x1E8F);	//FlashRead(0);
+		//printf("%04X\n", x);
+		if (x & 0x80) break;
+	}
+	return 0;
+}
+
+/*
+ * FlashEraseBootBlock
+ */
+int FlashEraseBootBlock()
+{
+	int sector;
+	int checkByte;
+	
+	for (sector = 0; sector < 8; sector += 2)
+	{
+		// First Halfword of four
+		CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+		CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+		CartWrite(0x213C2, 0x80);	//FlashWrite(0x5555, 0x80);
+		CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+		CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+		CartWrite(sector, 0x30);
+		
+		Delay100ms();
+		
+		for (checkByte = sector; checkByte < 0x4000; checkByte += 16)
+		{
+			if ((CartRead(checkByte) & 0xFF) != 0xFF) checkByte = sector;
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * RomProgram
+ */
+void RomProgram(unsigned short *buffer, unsigned int addr, unsigned int length)
+{
+	length = length / sizeof(buffer[0]);	// Account for size of shorts
+	for (unsigned int i=0; i<length; i++)
+	{
+		CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+		CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+		CartWrite(0x213C2, 0xA0);	//FlashWrite(0x5555, 0xA0);
+		RomWrite(addr, buffer[i]);
+		while (RomRead(addr) != buffer[i]);
+		addr++;
+	}
+}
+
+/*
+ * RomVerify
+ */
+int RomVerify(unsigned short *buffer, unsigned int addr, unsigned int length)
+{
+	length = length / sizeof(buffer[0]);	// Account for size of shorts
+	for (unsigned int i=0; i<length; i++)
+	{
+		unsigned short data = RomRead(addr);
+		if (data != buffer[i]) return -1;
+		addr++;
+	}
+	return 0;
+}
+
+/*
+ * FlashProgram
+ */
+void FlashProgram(unsigned short *buffer, unsigned int addr, unsigned int length)
+{
+	for (unsigned int i=0; i<length; i++)
+	{
+		CartWrite(0x213C2, 0xAA);	//FlashWrite(0x5555, 0xAA);
+		CartWrite(0x10C3D, 0x55);	//FlashWrite(0x2AAA, 0x55);
+		CartWrite(0x213C2, 0xA0);	//FlashWrite(0x5555, 0xA0);
+		FlashWrite(addr, buffer[i]);
+		while (FlashRead(addr) != buffer[i]);
+		addr++;
+	}
+}
+
+/*
+ * FlashVerify
+ */
+int FlashVerify(unsigned short *buffer, unsigned int addr, unsigned int length)
+{
+	for (unsigned int i=0; i<length; i++)
+	{
+		unsigned short data = FlashRead(addr);
+		if (data != buffer[i]) return -1;
+		addr++;
+	}
+	return 0;
+}
